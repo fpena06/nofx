@@ -136,7 +136,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
             oiTopUrl: signalSource.oi_top_url || '',
           })
         } catch (error) {
-          console.log('📡 用户信号源配置暂未设置')
+          console.log('📡 User signal source configuration not set yet')
         }
       } catch (error) {
         console.error('Failed to load configs:', error)
@@ -1869,7 +1869,7 @@ function ExchangeConfigModal({
         }
       }
     } catch (err) {
-      console.error('复制失败:', err)
+      console.error('Copy failed:', err)
       // 显示错误提示
       toast.error(
         t('copyIPFailed', language) || `复制失败: ${ip}\n请手动复制此IP地址`

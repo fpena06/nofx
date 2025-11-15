@@ -87,7 +87,7 @@ func SetUseDefaultCoins(useDefault bool) {
 func SetDefaultCoins(coins []string) {
 	if len(coins) > 0 {
 		defaultMainstreamCoins = coins
-		log.Printf("✓ 已设置默认币种池（共%d个币种）: %v", len(coins), coins)
+		log.Printf("✓ Set default coin pool (%d coins): %v", len(coins), coins)
 	}
 }
 
@@ -95,13 +95,13 @@ func SetDefaultCoins(coins []string) {
 func GetCoinPool() ([]CoinInfo, error) {
 	// 优先检查是否启用默认币种列表
 	if coinPoolConfig.UseDefaultCoins {
-		log.Printf("✓ 已启用默认主流币种列表")
+		log.Printf("✓ Enabled default mainstream coin list")
 		return convertSymbolsToCoins(defaultMainstreamCoins), nil
 	}
 
 	// 检查API URL是否配置
 	if strings.TrimSpace(coinPoolConfig.APIURL) == "" {
-		log.Printf("⚠️  未配置币种池API URL，使用默认主流币种列表")
+		log.Printf("⚠️  Coin pool API URL not configured, using default mainstream coin list")
 		return convertSymbolsToCoins(defaultMainstreamCoins), nil
 	}
 
@@ -111,42 +111,42 @@ func GetCoinPool() ([]CoinInfo, error) {
 	// 尝试从API获取
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		if attempt > 1 {
-			log.Printf("⚠️  第%d次重试获取币种池（共%d次）...", attempt, maxRetries)
+			log.Printf("⚠️  Retry %d of %d to fetch coin pool...", attempt, maxRetries)
 			time.Sleep(2 * time.Second) // 重试前等待2秒
 		}
 
 		coins, err := fetchCoinPool()
 		if err == nil {
 			if attempt > 1 {
-				log.Printf("✓ 第%d次重试成功", attempt)
+				log.Printf("✓ Retry %d succeeded", attempt)
 			}
 			// 成功获取后保存到缓存
 			if err := saveCoinPoolCache(coins); err != nil {
-				log.Printf("⚠️  保存币种池缓存失败: %v", err)
+				log.Printf("⚠️  Failed to save coin pool cache: %v", err)
 			}
 			return coins, nil
 		}
 
 		lastErr = err
-		log.Printf("❌ 第%d次请求失败: %v", attempt, err)
+		log.Printf("❌ Request %d failed: %v", attempt, err)
 	}
 
 	// API获取失败，尝试使用缓存
-	log.Printf("⚠️  API请求全部失败，尝试使用历史缓存数据...")
+	log.Printf("⚠️  All API requests failed, trying to use historical cache data...")
 	cachedCoins, err := loadCoinPoolCache()
 	if err == nil {
-		log.Printf("✓ 使用历史缓存数据（共%d个币种）", len(cachedCoins))
+		log.Printf("✓ Using historical cache data (%d coins)", len(cachedCoins))
 		return cachedCoins, nil
 	}
 
 	// 缓存也失败，使用默认主流币种
-	log.Printf("⚠️  无法加载缓存数据（最后错误: %v），使用默认主流币种列表", lastErr)
+	log.Printf("⚠️  Cannot load cache data (last error: %v), using default mainstream coin list", lastErr)
 	return convertSymbolsToCoins(defaultMainstreamCoins), nil
 }
 
 // fetchCoinPool 实际执行币种池请求
 func fetchCoinPool() ([]CoinInfo, error) {
-	log.Printf("🔄 正在请求AI500币种池...")
+	log.Printf("🔄 Requesting AI500 coin pool...")
 
 	client := &http.Client{
 		Timeout: coinPoolConfig.Timeout,
@@ -154,31 +154,31 @@ func fetchCoinPool() ([]CoinInfo, error) {
 
 	resp, err := client.Get(coinPoolConfig.APIURL)
 	if err != nil {
-		return nil, fmt.Errorf("请求币种池API失败: %w", err)
+		return nil, fmt.Errorf("failed to request coin pool API: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %w", err)
+		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API返回错误 (status %d): %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("API returned error (status %d): %s", resp.StatusCode, string(body))
 	}
 
 	// 解析API响应
 	var response CoinPoolAPIResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("JSON解析失败: %w", err)
+		return nil, fmt.Errorf("JSON parsing failed: %w", err)
 	}
 
 	if !response.Success {
-		return nil, fmt.Errorf("API返回失败状态")
+		return nil, fmt.Errorf("API returned failure status")
 	}
 
 	if len(response.Data.Coins) == 0 {
-		return nil, fmt.Errorf("币种列表为空")
+		return nil, fmt.Errorf("coin list is empty")
 	}
 
 	// 设置IsAvailable标志
@@ -187,7 +187,7 @@ func fetchCoinPool() ([]CoinInfo, error) {
 		coins[i].IsAvailable = true
 	}
 
-	log.Printf("✓ 成功获取%d个币种", len(coins))
+	log.Printf("✓ Successfully fetched %d coins", len(coins))
 	return coins, nil
 }
 
@@ -195,7 +195,7 @@ func fetchCoinPool() ([]CoinInfo, error) {
 func saveCoinPoolCache(coins []CoinInfo) error {
 	// 确保缓存目录存在
 	if err := os.MkdirAll(coinPoolConfig.CacheDir, 0755); err != nil {
-		return fmt.Errorf("创建缓存目录失败: %w", err)
+		return fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
 	cache := CoinPoolCache{
@@ -206,15 +206,15 @@ func saveCoinPoolCache(coins []CoinInfo) error {
 
 	data, err := json.MarshalIndent(cache, "", "  ")
 	if err != nil {
-		return fmt.Errorf("序列化缓存数据失败: %w", err)
+		return fmt.Errorf("failed to serialize cache data: %w", err)
 	}
 
 	cachePath := filepath.Join(coinPoolConfig.CacheDir, "latest.json")
 	if err := ioutil.WriteFile(cachePath, data, 0644); err != nil {
-		return fmt.Errorf("写入缓存文件失败: %w", err)
+		return fmt.Errorf("failed to write cache file: %w", err)
 	}
 
-	log.Printf("💾 已保存币种池缓存（%d个币种）", len(coins))
+	log.Printf("💾 Saved coin pool cache (%d coins)", len(coins))
 	return nil
 }
 
@@ -224,25 +224,25 @@ func loadCoinPoolCache() ([]CoinInfo, error) {
 
 	// 检查文件是否存在
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("缓存文件不存在")
+		return nil, fmt.Errorf("cache file does not exist")
 	}
 
 	data, err := ioutil.ReadFile(cachePath)
 	if err != nil {
-		return nil, fmt.Errorf("读取缓存文件失败: %w", err)
+		return nil, fmt.Errorf("failed to read cache file: %w", err)
 	}
 
 	var cache CoinPoolCache
 	if err := json.Unmarshal(data, &cache); err != nil {
-		return nil, fmt.Errorf("解析缓存数据失败: %w", err)
+		return nil, fmt.Errorf("failed to parse cache data: %w", err)
 	}
 
 	// 检查缓存年龄
 	cacheAge := time.Since(cache.FetchedAt)
 	if cacheAge > 24*time.Hour {
-		log.Printf("⚠️  缓存数据较旧（%.1f小时前），但仍可使用", cacheAge.Hours())
+		log.Printf("⚠️  Cache data is old (%.1f hours ago), but still usable", cacheAge.Hours())
 	} else {
-		log.Printf("📂 缓存数据时间: %s（%.1f分钟前）",
+		log.Printf("📂 Cache data time: %s (%.1f minutes ago)",
 			cache.FetchedAt.Format("2006-01-02 15:04:05"),
 			cacheAge.Minutes())
 	}
@@ -267,7 +267,7 @@ func GetAvailableCoins() ([]string, error) {
 	}
 
 	if len(symbols) == 0 {
-		return nil, fmt.Errorf("没有可用的币种")
+		return nil, fmt.Errorf("no available coins")
 	}
 
 	return symbols, nil
@@ -289,7 +289,7 @@ func GetTopRatedCoins(limit int) ([]string, error) {
 	}
 
 	if len(availableCoins) == 0 {
-		return nil, fmt.Errorf("没有可用的币种")
+		return nil, fmt.Errorf("no available coins")
 	}
 
 	// 按Score降序排序（冒泡排序）
@@ -422,7 +422,7 @@ var oiTopConfig = struct {
 func GetOITopPositions() ([]OIPosition, error) {
 	// 检查API URL是否配置
 	if strings.TrimSpace(oiTopConfig.APIURL) == "" {
-		log.Printf("⚠️  未配置OI Top API URL，跳过OI Top数据获取")
+		log.Printf("⚠️  OI Top API URL not configured, skipping OI Top data fetch")
 		return []OIPosition{}, nil // 返回空列表，不是错误
 	}
 
@@ -432,42 +432,42 @@ func GetOITopPositions() ([]OIPosition, error) {
 	// 尝试从API获取
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		if attempt > 1 {
-			log.Printf("⚠️  第%d次重试获取OI Top数据（共%d次）...", attempt, maxRetries)
+			log.Printf("⚠️  Retry %d of %d to fetch OI Top data...", attempt, maxRetries)
 			time.Sleep(2 * time.Second)
 		}
 
 		positions, err := fetchOITop()
 		if err == nil {
 			if attempt > 1 {
-				log.Printf("✓ 第%d次重试成功", attempt)
+				log.Printf("✓ Retry %d succeeded", attempt)
 			}
 			// 成功获取后保存到缓存
 			if err := saveOITopCache(positions); err != nil {
-				log.Printf("⚠️  保存OI Top缓存失败: %v", err)
+				log.Printf("⚠️  Failed to save OI Top cache: %v", err)
 			}
 			return positions, nil
 		}
 
 		lastErr = err
-		log.Printf("❌ 第%d次请求OI Top失败: %v", attempt, err)
+		log.Printf("❌ OI Top request %d failed: %v", attempt, err)
 	}
 
 	// API获取失败，尝试使用缓存
-	log.Printf("⚠️  OI Top API请求全部失败，尝试使用历史缓存数据...")
+	log.Printf("⚠️  All OI Top API requests failed, trying to use historical cache data...")
 	cachedPositions, err := loadOITopCache()
 	if err == nil {
-		log.Printf("✓ 使用历史OI Top缓存数据（共%d个币种）", len(cachedPositions))
+		log.Printf("✓ Using historical OI Top cache data (%d coins)", len(cachedPositions))
 		return cachedPositions, nil
 	}
 
 	// 缓存也失败，返回空列表（OI Top是可选的）
-	log.Printf("⚠️  无法加载OI Top缓存数据（最后错误: %v），跳过OI Top数据", lastErr)
+	log.Printf("⚠️  Cannot load OI Top cache data (last error: %v), skipping OI Top data", lastErr)
 	return []OIPosition{}, nil
 }
 
 // fetchOITop 实际执行OI Top请求
 func fetchOITop() ([]OIPosition, error) {
-	log.Printf("🔄 正在请求OI Top数据...")
+	log.Printf("🔄 Requesting OI Top data...")
 
 	client := &http.Client{
 		Timeout: oiTopConfig.Timeout,
@@ -475,34 +475,34 @@ func fetchOITop() ([]OIPosition, error) {
 
 	resp, err := client.Get(oiTopConfig.APIURL)
 	if err != nil {
-		return nil, fmt.Errorf("请求OI Top API失败: %w", err)
+		return nil, fmt.Errorf("failed to request OI Top API: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取OI Top响应失败: %w", err)
+		return nil, fmt.Errorf("failed to read OI Top response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("OI Top API返回错误 (status %d): %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("OI Top API returned error (status %d): %s", resp.StatusCode, string(body))
 	}
 
 	// 解析API响应
 	var response OITopAPIResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("OI Top JSON解析失败: %w", err)
+		return nil, fmt.Errorf("OI Top JSON parsing failed: %w", err)
 	}
 
 	if !response.Success {
-		return nil, fmt.Errorf("OI Top API返回失败状态")
+		return nil, fmt.Errorf("OI Top API returned failure status")
 	}
 
 	if len(response.Data.Positions) == 0 {
-		return nil, fmt.Errorf("OI Top持仓列表为空")
+		return nil, fmt.Errorf("OI Top position list is empty")
 	}
 
-	log.Printf("✓ 成功获取%d个OI Top币种（时间范围: %s）",
+	log.Printf("✓ Successfully fetched %d OI Top coins (time range: %s)",
 		len(response.Data.Positions), response.Data.TimeRange)
 	return response.Data.Positions, nil
 }
@@ -510,7 +510,7 @@ func fetchOITop() ([]OIPosition, error) {
 // saveOITopCache 保存OI Top数据到缓存
 func saveOITopCache(positions []OIPosition) error {
 	if err := os.MkdirAll(oiTopConfig.CacheDir, 0755); err != nil {
-		return fmt.Errorf("创建缓存目录失败: %w", err)
+		return fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
 	cache := OITopCache{
@@ -521,15 +521,15 @@ func saveOITopCache(positions []OIPosition) error {
 
 	data, err := json.MarshalIndent(cache, "", "  ")
 	if err != nil {
-		return fmt.Errorf("序列化OI Top缓存数据失败: %w", err)
+		return fmt.Errorf("failed to serialize OI Top cache data: %w", err)
 	}
 
 	cachePath := filepath.Join(oiTopConfig.CacheDir, "oi_top_latest.json")
 	if err := ioutil.WriteFile(cachePath, data, 0644); err != nil {
-		return fmt.Errorf("写入OI Top缓存文件失败: %w", err)
+		return fmt.Errorf("failed to write OI Top cache file: %w", err)
 	}
 
-	log.Printf("💾 已保存OI Top缓存（%d个币种）", len(positions))
+	log.Printf("💾 Saved OI Top cache (%d coins)", len(positions))
 	return nil
 }
 
@@ -538,24 +538,24 @@ func loadOITopCache() ([]OIPosition, error) {
 	cachePath := filepath.Join(oiTopConfig.CacheDir, "oi_top_latest.json")
 
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("OI Top缓存文件不存在")
+		return nil, fmt.Errorf("OI Top cache file does not exist")
 	}
 
 	data, err := ioutil.ReadFile(cachePath)
 	if err != nil {
-		return nil, fmt.Errorf("读取OI Top缓存文件失败: %w", err)
+		return nil, fmt.Errorf("failed to read OI Top cache file: %w", err)
 	}
 
 	var cache OITopCache
 	if err := json.Unmarshal(data, &cache); err != nil {
-		return nil, fmt.Errorf("解析OI Top缓存数据失败: %w", err)
+		return nil, fmt.Errorf("failed to parse OI Top cache data: %w", err)
 	}
 
 	cacheAge := time.Since(cache.FetchedAt)
 	if cacheAge > 24*time.Hour {
-		log.Printf("⚠️  OI Top缓存数据较旧（%.1f小时前），但仍可使用", cacheAge.Hours())
+		log.Printf("⚠️  OI Top cache data is old (%.1f hours ago), but still usable", cacheAge.Hours())
 	} else {
-		log.Printf("📂 OI Top缓存数据时间: %s（%.1f分钟前）",
+		log.Printf("📂 OI Top cache data time: %s (%.1f minutes ago)",
 			cache.FetchedAt.Format("2006-01-02 15:04:05"),
 			cacheAge.Minutes())
 	}
@@ -592,14 +592,14 @@ func GetMergedCoinPool(ai500Limit int) (*MergedCoinPool, error) {
 	// 1. 获取AI500数据
 	ai500TopSymbols, err := GetTopRatedCoins(ai500Limit)
 	if err != nil {
-		log.Printf("⚠️  获取AI500数据失败: %v", err)
+		log.Printf("⚠️  Failed to fetch AI500 data: %v", err)
 		ai500TopSymbols = []string{} // 失败时用空列表
 	}
 
 	// 2. 获取OI Top数据
 	oiTopSymbols, err := GetOITopSymbols()
 	if err != nil {
-		log.Printf("⚠️  获取OI Top数据失败: %v", err)
+		log.Printf("⚠️  Failed to fetch OI Top data: %v", err)
 		oiTopSymbols = []string{} // 失败时用空列表
 	}
 
@@ -638,7 +638,7 @@ func GetMergedCoinPool(ai500Limit int) (*MergedCoinPool, error) {
 		SymbolSources: symbolSources,
 	}
 
-	log.Printf("📊 币种池合并完成: AI500=%d, OI_Top=%d, 总计(去重)=%d",
+	log.Printf("📊 Coin pool merge completed: AI500=%d, OI_Top=%d, Total (deduplicated)=%d",
 		len(ai500TopSymbols), len(oiTopSymbols), len(allSymbols))
 
 	return merged, nil

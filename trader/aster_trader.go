@@ -55,7 +55,7 @@ func NewAsterTrader(user, signer, privateKeyHex string) (*AsterTrader, error) {
 	// 解析私钥
 	privKey, err := crypto.HexToECDSA(strings.TrimPrefix(privateKeyHex, "0x"))
 	if err != nil {
-		return nil, fmt.Errorf("解析私钥失败: %w", err)
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
 	client := &http.Client{
 		Timeout: 30 * time.Second, // 增加到30秒
@@ -147,7 +147,7 @@ func (t *AsterTrader) getPrecision(symbol string) (SymbolPrecision, error) {
 		return prec, nil
 	}
 
-	return SymbolPrecision{}, fmt.Errorf("未找到交易对 %s 的精度信息", symbol)
+	return SymbolPrecision{}, fmt.Errorf("precision information not found for trading pair %s", symbol)
 }
 
 // roundToTickSize 将价格/数量四舍五入到tick size/step size的整数倍
@@ -296,7 +296,7 @@ func (t *AsterTrader) sign(params map[string]interface{}, nonce uint64) error {
 
 	packed, err := arguments.Pack(jsonStr, addrUser, addrSigner, nonceBig)
 	if err != nil {
-		return fmt.Errorf("ABI编码失败: %w", err)
+		return fmt.Errorf("ABI encoding failed: %w", err)
 	}
 
 	// Keccak256哈希
@@ -309,12 +309,12 @@ func (t *AsterTrader) sign(params map[string]interface{}, nonce uint64) error {
 	// ECDSA签名
 	sig, err := crypto.Sign(msgHash.Bytes(), t.privateKey)
 	if err != nil {
-		return fmt.Errorf("签名失败: %w", err)
+		return fmt.Errorf("signature failed: %w", err)
 	}
 
 	// 将v从0/1转换为27/28
 	if len(sig) != 65 {
-		return fmt.Errorf("签名长度异常: %d", len(sig))
+		return fmt.Errorf("abnormal signature length: %d", len(sig))
 	}
 	sig[64] += 27
 
@@ -367,7 +367,7 @@ func (t *AsterTrader) request(method, endpoint string, params map[string]interfa
 		return nil, err
 	}
 
-	return nil, fmt.Errorf("请求失败（已重试%d次）: %w", maxRetries, lastErr)
+	return nil, fmt.Errorf("request failed (retried %d times): %w", maxRetries, lastErr)
 }
 
 // doRequest 执行实际的HTTP请求
@@ -427,7 +427,7 @@ func (t *AsterTrader) doRequest(method, endpoint string, params map[string]inter
 		return body, nil
 
 	default:
-		return nil, fmt.Errorf("不支持的HTTP方法: %s", method)
+		return nil, fmt.Errorf("unsupported HTTP method: %s", method)
 	}
 }
 
@@ -469,13 +469,13 @@ func (t *AsterTrader) GetBalance() (map[string]interface{}, error) {
 	}
 
 	if !foundUSDT {
-		log.Printf("⚠️  未找到USDT资产记录！")
+		log.Printf("⚠️  USDT asset record not found!")
 	}
 
 	// 获取持仓计算保证金占用和真实未实现盈亏
 	positions, err := t.GetPositions()
 	if err != nil {
-		log.Printf("⚠️  获取持仓信息失败: %v", err)
+		log.Printf("⚠️  Failed to get position information: %v", err)
 		// fallback: 无法获取持仓时使用简单计算
 		return map[string]interface{}{
 			"totalWalletBalance":    crossWalletBalance,
@@ -577,12 +577,12 @@ func (t *AsterTrader) GetPositions() ([]map[string]interface{}, error) {
 func (t *AsterTrader) OpenLong(symbol string, quantity float64, leverage int) (map[string]interface{}, error) {
 	// 开仓前先取消所有挂单,防止残留挂单导致仓位叠加
 	if err := t.CancelAllOrders(symbol); err != nil {
-		log.Printf("  ⚠ 取消挂单失败(继续开仓): %v", err)
+		log.Printf("  ⚠ Failed to cancel pending orders (continuing to open position): %v", err)
 	}
 
 	// 先设置杠杆
 	if err := t.SetLeverage(symbol, leverage); err != nil {
-		return nil, fmt.Errorf("设置杠杆失败: %w", err)
+		return nil, fmt.Errorf("failed to set leverage: %w", err)
 	}
 
 	// 获取当前价格
@@ -614,7 +614,7 @@ func (t *AsterTrader) OpenLong(symbol string, quantity float64, leverage int) (m
 	priceStr := t.formatFloatWithPrecision(formattedPrice, prec.PricePrecision)
 	qtyStr := t.formatFloatWithPrecision(formattedQty, prec.QuantityPrecision)
 
-	log.Printf("  📏 精度处理: 价格 %.8f -> %s (精度=%d), 数量 %.8f -> %s (精度=%d)",
+	log.Printf("  📏 Precision handling: price %.8f -> %s (precision=%d), quantity %.8f -> %s (precision=%d)",
 		limitPrice, priceStr, prec.PricePrecision, quantity, qtyStr, prec.QuantityPrecision)
 
 	params := map[string]interface{}{
@@ -644,12 +644,12 @@ func (t *AsterTrader) OpenLong(symbol string, quantity float64, leverage int) (m
 func (t *AsterTrader) OpenShort(symbol string, quantity float64, leverage int) (map[string]interface{}, error) {
 	// 开仓前先取消所有挂单,防止残留挂单导致仓位叠加
 	if err := t.CancelAllOrders(symbol); err != nil {
-		log.Printf("  ⚠ 取消挂单失败(继续开仓): %v", err)
+		log.Printf("  ⚠ Failed to cancel pending orders (continuing to open position): %v", err)
 	}
 
 	// 先设置杠杆
 	if err := t.SetLeverage(symbol, leverage); err != nil {
-		return nil, fmt.Errorf("设置杠杆失败: %w", err)
+		return nil, fmt.Errorf("failed to set leverage: %w", err)
 	}
 
 	// 获取当前价格
@@ -681,7 +681,7 @@ func (t *AsterTrader) OpenShort(symbol string, quantity float64, leverage int) (
 	priceStr := t.formatFloatWithPrecision(formattedPrice, prec.PricePrecision)
 	qtyStr := t.formatFloatWithPrecision(formattedQty, prec.QuantityPrecision)
 
-	log.Printf("  📏 精度处理: 价格 %.8f -> %s (精度=%d), 数量 %.8f -> %s (精度=%d)",
+	log.Printf("  📏 Precision handling: price %.8f -> %s (precision=%d), quantity %.8f -> %s (precision=%d)",
 		limitPrice, priceStr, prec.PricePrecision, quantity, qtyStr, prec.QuantityPrecision)
 
 	params := map[string]interface{}{
@@ -724,9 +724,9 @@ func (t *AsterTrader) CloseLong(symbol string, quantity float64) (map[string]int
 		}
 
 		if quantity == 0 {
-			return nil, fmt.Errorf("没有找到 %s 的多仓", symbol)
+			return nil, fmt.Errorf("no long position found for %s", symbol)
 		}
-		log.Printf("  📊 获取到多仓数量: %.8f", quantity)
+		log.Printf("  📊 Got long position quantity: %.8f", quantity)
 	}
 
 	price, err := t.GetMarketPrice(symbol)
@@ -756,7 +756,7 @@ func (t *AsterTrader) CloseLong(symbol string, quantity float64) (map[string]int
 	priceStr := t.formatFloatWithPrecision(formattedPrice, prec.PricePrecision)
 	qtyStr := t.formatFloatWithPrecision(formattedQty, prec.QuantityPrecision)
 
-	log.Printf("  📏 精度处理: 价格 %.8f -> %s (精度=%d), 数量 %.8f -> %s (精度=%d)",
+	log.Printf("  📏 Precision handling: price %.8f -> %s (precision=%d), quantity %.8f -> %s (precision=%d)",
 		limitPrice, priceStr, prec.PricePrecision, quantity, qtyStr, prec.QuantityPrecision)
 
 	params := map[string]interface{}{
@@ -779,11 +779,11 @@ func (t *AsterTrader) CloseLong(symbol string, quantity float64) (map[string]int
 		return nil, err
 	}
 
-	log.Printf("✓ 平多仓成功: %s 数量: %s", symbol, qtyStr)
+	log.Printf("✓ Successfully closed long position: %s quantity: %s", symbol, qtyStr)
 
 	// 平仓后取消该币种的所有挂单(止损止盈单)
 	if err := t.CancelAllOrders(symbol); err != nil {
-		log.Printf("  ⚠ 取消挂单失败: %v", err)
+		log.Printf("  ⚠ Failed to cancel pending orders: %v", err)
 	}
 
 	return result, nil
@@ -807,9 +807,9 @@ func (t *AsterTrader) CloseShort(symbol string, quantity float64) (map[string]in
 		}
 
 		if quantity == 0 {
-			return nil, fmt.Errorf("没有找到 %s 的空仓", symbol)
+			return nil, fmt.Errorf("no short position found for %s", symbol)
 		}
-		log.Printf("  📊 获取到空仓数量: %.8f", quantity)
+		log.Printf("  📊 Got short position quantity: %.8f", quantity)
 	}
 
 	price, err := t.GetMarketPrice(symbol)
@@ -839,7 +839,7 @@ func (t *AsterTrader) CloseShort(symbol string, quantity float64) (map[string]in
 	priceStr := t.formatFloatWithPrecision(formattedPrice, prec.PricePrecision)
 	qtyStr := t.formatFloatWithPrecision(formattedQty, prec.QuantityPrecision)
 
-	log.Printf("  📏 精度处理: 价格 %.8f -> %s (精度=%d), 数量 %.8f -> %s (精度=%d)",
+	log.Printf("  📏 Precision handling: price %.8f -> %s (precision=%d), quantity %.8f -> %s (precision=%d)",
 		limitPrice, priceStr, prec.PricePrecision, quantity, qtyStr, prec.QuantityPrecision)
 
 	params := map[string]interface{}{
@@ -862,11 +862,11 @@ func (t *AsterTrader) CloseShort(symbol string, quantity float64) (map[string]in
 		return nil, err
 	}
 
-	log.Printf("✓ 平空仓成功: %s 数量: %s", symbol, qtyStr)
+	log.Printf("✓ Successfully closed short position: %s quantity: %s", symbol, qtyStr)
 
 	// 平仓后取消该币种的所有挂单(止损止盈单)
 	if err := t.CancelAllOrders(symbol); err != nil {
-		log.Printf("  ⚠ 取消挂单失败: %v", err)
+		log.Printf("  ⚠ Failed to cancel pending orders: %v", err)
 	}
 
 	return result, nil
@@ -892,30 +892,30 @@ func (t *AsterTrader) SetMarginMode(symbol string, isCrossMargin bool) error {
 		// 如果错误表示无需更改，忽略错误
 		if strings.Contains(err.Error(), "No need to change") ||
 			strings.Contains(err.Error(), "Margin type cannot be changed") {
-			log.Printf("  ✓ %s 仓位模式已是 %s 或有持仓无法更改", symbol, marginType)
+			log.Printf("  ✓ %s margin mode is already %s or cannot be changed due to existing positions", symbol, marginType)
 			return nil
 		}
 		// 检测多资产模式（错误码 -4168）
 		if strings.Contains(err.Error(), "Multi-Assets mode") ||
 			strings.Contains(err.Error(), "-4168") ||
 			strings.Contains(err.Error(), "4168") {
-			log.Printf("  ⚠️ %s 检测到多资产模式，强制使用全仓模式", symbol)
-			log.Printf("  💡 提示：如需使用逐仓模式，请在交易所关闭多资产模式")
+			log.Printf("  ⚠️ %s Multi-Assets mode detected, forcing cross margin mode", symbol)
+			log.Printf("  💡 Tip: To use isolated margin mode, please disable multi-assets mode in the exchange")
 			return nil
 		}
 		// 检测统一账户 API
 		if strings.Contains(err.Error(), "unified") ||
 			strings.Contains(err.Error(), "portfolio") ||
 			strings.Contains(err.Error(), "Portfolio") {
-			log.Printf("  ❌ %s 检测到统一账户 API，无法进行合约交易", symbol)
-			return fmt.Errorf("请使用「现货与合约交易」API 权限，不要使用「统一账户 API」")
+			log.Printf("  ❌ %s Unified account API detected, unable to perform futures trading", symbol)
+			return fmt.Errorf("please use 'Spot and Futures Trading' API permissions, do not use 'Unified Account API'")
 		}
-		log.Printf("  ⚠️ 设置仓位模式失败: %v", err)
+		log.Printf("  ⚠️ Failed to set margin mode: %v", err)
 		// 不返回错误，让交易继续
 		return nil
 	}
 
-	log.Printf("  ✓ %s 仓位模式已设置为 %s", symbol, marginType)
+	log.Printf("  ✓ %s margin mode set to %s", symbol, marginType)
 	return nil
 }
 
@@ -951,7 +951,7 @@ func (t *AsterTrader) GetMarketPrice(symbol string) (float64, error) {
 
 	priceStr, ok := result["price"].(string)
 	if !ok {
-		return 0, errors.New("无法获取价格")
+		return 0, errors.New("unable to get price")
 	}
 
 	return strconv.ParseFloat(priceStr, 64)
@@ -1048,12 +1048,12 @@ func (t *AsterTrader) CancelStopLossOrders(symbol string) error {
 
 	body, err := t.request("GET", "/fapi/v3/openOrders", params)
 	if err != nil {
-		return fmt.Errorf("获取未完成订单失败: %w", err)
+		return fmt.Errorf("failed to get open orders: %w", err)
 	}
 
 	var orders []map[string]interface{}
 	if err := json.Unmarshal(body, &orders); err != nil {
-		return fmt.Errorf("解析订单数据失败: %w", err)
+		return fmt.Errorf("failed to parse order data: %w", err)
 	}
 
 	// 过滤出止损单并取消（取消所有方向的止损单，包括LONG和SHORT）
@@ -1075,24 +1075,24 @@ func (t *AsterTrader) CancelStopLossOrders(symbol string) error {
 			if err != nil {
 				errMsg := fmt.Sprintf("订单ID %d: %v", int64(orderID), err)
 				cancelErrors = append(cancelErrors, fmt.Errorf("%s", errMsg))
-				log.Printf("  ⚠ 取消止损单失败: %s", errMsg)
+				log.Printf("  ⚠ Failed to cancel stop-loss order: %s", errMsg)
 				continue
 			}
 
 			canceledCount++
-			log.Printf("  ✓ 已取消止损单 (订单ID: %d, 类型: %s, 方向: %s)", int64(orderID), orderType, positionSide)
+			log.Printf("  ✓ Canceled stop-loss order (Order ID: %d, Type: %s, Direction: %s)", int64(orderID), orderType, positionSide)
 		}
 	}
 
 	if canceledCount == 0 && len(cancelErrors) == 0 {
-		log.Printf("  ℹ %s 没有止损单需要取消", symbol)
+		log.Printf("  ℹ %s No stop-loss orders to cancel", symbol)
 	} else if canceledCount > 0 {
-		log.Printf("  ✓ 已取消 %s 的 %d 个止损单", symbol, canceledCount)
+		log.Printf("  ✓ Canceled %d stop-loss orders for %s", canceledCount, symbol)
 	}
 
 	// 如果所有取消都失败了，返回错误
 	if len(cancelErrors) > 0 && canceledCount == 0 {
-		return fmt.Errorf("取消止损单失败: %v", cancelErrors)
+		return fmt.Errorf("failed to cancel stop-loss orders: %v", cancelErrors)
 	}
 
 	return nil
@@ -1107,12 +1107,12 @@ func (t *AsterTrader) CancelTakeProfitOrders(symbol string) error {
 
 	body, err := t.request("GET", "/fapi/v3/openOrders", params)
 	if err != nil {
-		return fmt.Errorf("获取未完成订单失败: %w", err)
+		return fmt.Errorf("failed to get open orders: %w", err)
 	}
 
 	var orders []map[string]interface{}
 	if err := json.Unmarshal(body, &orders); err != nil {
-		return fmt.Errorf("解析订单数据失败: %w", err)
+		return fmt.Errorf("failed to parse order data: %w", err)
 	}
 
 	// 过滤出止盈单并取消（取消所有方向的止盈单，包括LONG和SHORT）
@@ -1134,24 +1134,24 @@ func (t *AsterTrader) CancelTakeProfitOrders(symbol string) error {
 			if err != nil {
 				errMsg := fmt.Sprintf("订单ID %d: %v", int64(orderID), err)
 				cancelErrors = append(cancelErrors, fmt.Errorf("%s", errMsg))
-				log.Printf("  ⚠ 取消止盈单失败: %s", errMsg)
+				log.Printf("  ⚠ Failed to cancel take-profit order: %s", errMsg)
 				continue
 			}
 
 			canceledCount++
-			log.Printf("  ✓ 已取消止盈单 (订单ID: %d, 类型: %s, 方向: %s)", int64(orderID), orderType, positionSide)
+			log.Printf("  ✓ Canceled take-profit order (Order ID: %d, Type: %s, Direction: %s)", int64(orderID), orderType, positionSide)
 		}
 	}
 
 	if canceledCount == 0 && len(cancelErrors) == 0 {
-		log.Printf("  ℹ %s 没有止盈单需要取消", symbol)
+		log.Printf("  ℹ %s No take-profit orders to cancel", symbol)
 	} else if canceledCount > 0 {
-		log.Printf("  ✓ 已取消 %s 的 %d 个止盈单", symbol, canceledCount)
+		log.Printf("  ✓ Canceled %d take-profit orders for %s", canceledCount, symbol)
 	}
 
 	// 如果所有取消都失败了，返回错误
 	if len(cancelErrors) > 0 && canceledCount == 0 {
-		return fmt.Errorf("取消止盈单失败: %v", cancelErrors)
+		return fmt.Errorf("failed to cancel take-profit orders: %v", cancelErrors)
 	}
 
 	return nil
@@ -1176,12 +1176,12 @@ func (t *AsterTrader) CancelStopOrders(symbol string) error {
 
 	body, err := t.request("GET", "/fapi/v3/openOrders", params)
 	if err != nil {
-		return fmt.Errorf("获取未完成订单失败: %w", err)
+		return fmt.Errorf("failed to get open orders: %w", err)
 	}
 
 	var orders []map[string]interface{}
 	if err := json.Unmarshal(body, &orders); err != nil {
-		return fmt.Errorf("解析订单数据失败: %w", err)
+		return fmt.Errorf("failed to parse order data: %w", err)
 	}
 
 	// 过滤出止盈止损单并取消
@@ -1203,20 +1203,20 @@ func (t *AsterTrader) CancelStopOrders(symbol string) error {
 
 			_, err := t.request("DELETE", "/fapi/v3/order", cancelParams)
 			if err != nil {
-				log.Printf("  ⚠ 取消订单 %d 失败: %v", int64(orderID), err)
+				log.Printf("  ⚠ Failed to cancel order %d: %v", int64(orderID), err)
 				continue
 			}
 
 			canceledCount++
-			log.Printf("  ✓ 已取消 %s 的止盈/止损单 (订单ID: %d, 类型: %s)",
+			log.Printf("  ✓ Canceled take-profit/stop-loss order for %s (Order ID: %d, Type: %s)",
 				symbol, int64(orderID), orderType)
 		}
 	}
 
 	if canceledCount == 0 {
-		log.Printf("  ℹ %s 没有止盈/止损单需要取消", symbol)
+		log.Printf("  ℹ %s No take-profit/stop-loss orders to cancel", symbol)
 	} else {
-		log.Printf("  ✓ 已取消 %s 的 %d 个止盈/止损单", symbol, canceledCount)
+		log.Printf("  ✓ Canceled %d take-profit/stop-loss orders for %s", canceledCount, symbol)
 	}
 
 	return nil

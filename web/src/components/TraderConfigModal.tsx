@@ -221,7 +221,7 @@ export function TraderConfigModal({
       setFormData((prev) => ({ ...prev, initial_balance: currentBalance }))
       toast.success('已获取当前余额')
     } catch (error) {
-      console.error('获取余额失败:', error)
+      console.error('Failed to fetch balance:', error)
       setBalanceFetchError('获取余额失败，请检查网络连接')
       toast.error('获取余额失败，请检查网络连接')
     } finally {
@@ -257,7 +257,7 @@ export function TraderConfigModal({
       })
       onClose()
     } catch (error) {
-      console.error('保存失败:', error)
+      console.error('Save failed:', error)
     } finally {
       setIsSaving(false)
     }

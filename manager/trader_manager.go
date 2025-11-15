@@ -46,24 +46,24 @@ func (tm *TraderManager) LoadTradersFromDatabase(database *config.Database) erro
 	// 获取所有用户
 	userIDs, err := database.GetAllUsers()
 	if err != nil {
-		return fmt.Errorf("获取用户列表失败: %w", err)
+		return fmt.Errorf("failed to get user list: %w", err)
 	}
 
-	log.Printf("📋 发现 %d 个用户，开始加载所有交易员配置...", len(userIDs))
+	log.Printf("📋 Found %d users, loading all trader configurations...", len(userIDs))
 
 	var allTraders []*config.TraderRecord
 	for _, userID := range userIDs {
 		// 获取每个用户的交易员
 		traders, err := database.GetTraders(userID)
 		if err != nil {
-			log.Printf("⚠️ 获取用户 %s 的交易员失败: %v", userID, err)
+			log.Printf("⚠️ Failed to get traders for user %s: %v", userID, err)
 			continue
 		}
-		log.Printf("📋 用户 %s: %d 个交易员", userID, len(traders))
+		log.Printf("📋 User %s: %d traders", userID, len(traders))
 		allTraders = append(allTraders, traders...)
 	}
 
-	log.Printf("📋 总共加载 %d 个交易员配置", len(allTraders))
+	log.Printf("📋 Total %d trader configurations loaded", len(allTraders))
 
 	// 获取系统配置（不包含信号源，信号源现在为用户级别）
 	maxDailyLossStr, _ := database.GetSystemConfig("max_daily_loss")
@@ -91,7 +91,7 @@ func (tm *TraderManager) LoadTradersFromDatabase(database *config.Database) erro
 	var defaultCoins []string
 	if defaultCoinsStr != "" {
 		if err := json.Unmarshal([]byte(defaultCoinsStr), &defaultCoins); err != nil {
-			log.Printf("⚠️ 解析默认币种配置失败: %v，使用空列表", err)
+			log.Printf("⚠️ Failed to parse default coins config: %v, using empty list", err)
 			defaultCoins = []string{}
 		}
 	}
@@ -101,7 +101,7 @@ func (tm *TraderManager) LoadTradersFromDatabase(database *config.Database) erro
 		// 获取AI模型配置（使用交易员所属的用户ID）
 		aiModels, err := database.GetAIModels(traderCfg.UserID)
 		if err != nil {
-			log.Printf("⚠️  获取AI模型配置失败: %v", err)
+			log.Printf("⚠️  Failed to get AI model config: %v", err)
 			continue
 		}
 
@@ -118,26 +118,26 @@ func (tm *TraderManager) LoadTradersFromDatabase(database *config.Database) erro
 			for _, model := range aiModels {
 				if model.Provider == traderCfg.AIModelID {
 					aiModelCfg = model
-					log.Printf("⚠️  交易员 %s 使用旧版 provider 匹配: %s -> %s", traderCfg.Name, traderCfg.AIModelID, model.ID)
+					log.Printf("⚠️  Trader %s using legacy provider matching: %s -> %s", traderCfg.Name, traderCfg.AIModelID, model.ID)
 					break
 				}
 			}
 		}
 
 		if aiModelCfg == nil {
-			log.Printf("⚠️  交易员 %s 的AI模型 %s 不存在，跳过", traderCfg.Name, traderCfg.AIModelID)
+			log.Printf("⚠️  AI model %s for trader %s does not exist, skipping", traderCfg.AIModelID, traderCfg.Name)
 			continue
 		}
 
 		if !aiModelCfg.Enabled {
-			log.Printf("⚠️  交易员 %s 的AI模型 %s 未启用，跳过", traderCfg.Name, traderCfg.AIModelID)
+			log.Printf("⚠️  AI model %s for trader %s is not enabled, skipping", traderCfg.AIModelID, traderCfg.Name)
 			continue
 		}
 
 		// 获取交易所配置（使用交易员所属的用户ID）
 		exchanges, err := database.GetExchanges(traderCfg.UserID)
 		if err != nil {
-			log.Printf("⚠️  获取交易所配置失败: %v", err)
+			log.Printf("⚠️  Failed to get exchange config: %v", err)
 			continue
 		}
 
@@ -150,12 +150,12 @@ func (tm *TraderManager) LoadTradersFromDatabase(database *config.Database) erro
 		}
 
 		if exchangeCfg == nil {
-			log.Printf("⚠️  交易员 %s 的交易所 %s 不存在，跳过", traderCfg.Name, traderCfg.ExchangeID)
+			log.Printf("⚠️  Exchange %s for trader %s does not exist, skipping", traderCfg.ExchangeID, traderCfg.Name)
 			continue
 		}
 
 		if !exchangeCfg.Enabled {
-			log.Printf("⚠️  交易员 %s 的交易所 %s 未启用，跳过", traderCfg.Name, traderCfg.ExchangeID)
+			log.Printf("⚠️  Exchange %s for trader %s is not enabled, skipping", traderCfg.ExchangeID, traderCfg.Name)
 			continue
 		}
 
@@ -166,25 +166,25 @@ func (tm *TraderManager) LoadTradersFromDatabase(database *config.Database) erro
 			oiTopURL = userSignalSource.OITopURL
 		} else {
 			// 如果用户没有配置信号源，使用空字符串
-			log.Printf("🔍 用户 %s 暂未配置信号源", traderCfg.UserID)
+			log.Printf("🔍 User %s has not configured signal sources yet", traderCfg.UserID)
 		}
 
 		// 添加到TraderManager
 		err = tm.addTraderFromDB(traderCfg, aiModelCfg, exchangeCfg, coinPoolURL, oiTopURL, maxDailyLoss, maxDrawdown, stopTradingMinutes, defaultCoins, database, traderCfg.UserID)
 		if err != nil {
-			log.Printf("❌ 添加交易员 %s 失败: %v", traderCfg.Name, err)
+			log.Printf("❌ Failed to add trader %s: %v", traderCfg.Name, err)
 			continue
 		}
 	}
 
-	log.Printf("✓ 成功加载 %d 个交易员到内存", len(tm.traders))
+	log.Printf("✓ Successfully loaded %d traders to memory", len(tm.traders))
 	return nil
 }
 
 // addTraderFromConfig 内部方法：从配置添加交易员（不加锁，因为调用方已加锁）
 func (tm *TraderManager) addTraderFromDB(traderCfg *config.TraderRecord, aiModelCfg *config.AIModelConfig, exchangeCfg *config.ExchangeConfig, coinPoolURL, oiTopURL string, maxDailyLoss, maxDrawdown float64, stopTradingMinutes int, defaultCoins []string, database *config.Database, userID string) error {
 	if _, exists := tm.traders[traderCfg.ID]; exists {
-		return fmt.Errorf("trader ID '%s' 已存在", traderCfg.ID)
+		return fmt.Errorf("trader ID '%s' already exists", traderCfg.ID)
 	}
 
 	// 处理交易币种列表
@@ -209,7 +209,7 @@ func (tm *TraderManager) addTraderFromDB(traderCfg *config.TraderRecord, aiModel
 	var effectiveCoinPoolURL string
 	if traderCfg.UseCoinPool && coinPoolURL != "" {
 		effectiveCoinPoolURL = coinPoolURL
-		log.Printf("✓ 交易员 %s 启用 COIN POOL 信号源: %s", traderCfg.Name, coinPoolURL)
+		log.Printf("✓ Trader %s enabled COIN POOL signal source: %s", traderCfg.Name, coinPoolURL)
 	}
 
 	// 构建AutoTraderConfig
@@ -264,7 +264,7 @@ func (tm *TraderManager) addTraderFromDB(traderCfg *config.TraderRecord, aiModel
 	// 创建trader实例
 	at, err := trader.NewAutoTrader(traderConfig, database, userID)
 	if err != nil {
-		return fmt.Errorf("创建trader失败: %w", err)
+		return fmt.Errorf("failed to create trader: %w", err)
 	}
 
 	// 设置自定义prompt（如果有）
@@ -272,14 +272,14 @@ func (tm *TraderManager) addTraderFromDB(traderCfg *config.TraderRecord, aiModel
 		at.SetCustomPrompt(traderCfg.CustomPrompt)
 		at.SetOverrideBasePrompt(traderCfg.OverrideBasePrompt)
 		if traderCfg.OverrideBasePrompt {
-			log.Printf("✓ 已设置自定义交易策略prompt (覆盖基础prompt)")
+			log.Printf("✓ Custom trading strategy prompt set (overriding base prompt)")
 		} else {
-			log.Printf("✓ 已设置自定义交易策略prompt (补充基础prompt)")
+			log.Printf("✓ Custom trading strategy prompt set (supplementing base prompt)")
 		}
 	}
 
 	tm.traders[traderCfg.ID] = at
-	log.Printf("✓ Trader '%s' (%s + %s) 已加载到内存", traderCfg.Name, aiModelCfg.Provider, exchangeCfg.ID)
+	log.Printf("✓ Trader '%s' (%s + %s) loaded to memory", traderCfg.Name, aiModelCfg.Provider, exchangeCfg.ID)
 	return nil
 }
 
@@ -291,7 +291,7 @@ func (tm *TraderManager) AddTraderFromDB(traderCfg *config.TraderRecord, aiModel
 	defer tm.mu.Unlock()
 
 	if _, exists := tm.traders[traderCfg.ID]; exists {
-		return fmt.Errorf("trader ID '%s' 已存在", traderCfg.ID)
+		return fmt.Errorf("trader ID '%s' already exists", traderCfg.ID)
 	}
 
 	// 处理交易币种列表
@@ -316,7 +316,7 @@ func (tm *TraderManager) AddTraderFromDB(traderCfg *config.TraderRecord, aiModel
 	var effectiveCoinPoolURL string
 	if traderCfg.UseCoinPool && coinPoolURL != "" {
 		effectiveCoinPoolURL = coinPoolURL
-		log.Printf("✓ 交易员 %s 启用 COIN POOL 信号源: %s", traderCfg.Name, coinPoolURL)
+		log.Printf("✓ Trader %s enabled COIN POOL signal source: %s", traderCfg.Name, coinPoolURL)
 	}
 
 	// 构建AutoTraderConfig
@@ -370,7 +370,7 @@ func (tm *TraderManager) AddTraderFromDB(traderCfg *config.TraderRecord, aiModel
 	// 创建trader实例
 	at, err := trader.NewAutoTrader(traderConfig, database, userID)
 	if err != nil {
-		return fmt.Errorf("创建trader失败: %w", err)
+		return fmt.Errorf("failed to create trader: %w", err)
 	}
 
 	// 设置自定义prompt（如果有）
@@ -378,14 +378,14 @@ func (tm *TraderManager) AddTraderFromDB(traderCfg *config.TraderRecord, aiModel
 		at.SetCustomPrompt(traderCfg.CustomPrompt)
 		at.SetOverrideBasePrompt(traderCfg.OverrideBasePrompt)
 		if traderCfg.OverrideBasePrompt {
-			log.Printf("✓ 已设置自定义交易策略prompt (覆盖基础prompt)")
+			log.Printf("✓ Custom trading strategy prompt set (overriding base prompt)")
 		} else {
-			log.Printf("✓ 已设置自定义交易策略prompt (补充基础prompt)")
+			log.Printf("✓ Custom trading strategy prompt set (supplementing base prompt)")
 		}
 	}
 
 	tm.traders[traderCfg.ID] = at
-	log.Printf("✓ Trader '%s' (%s + %s) 已添加", traderCfg.Name, aiModelCfg.Provider, exchangeCfg.ID)
+	log.Printf("✓ Trader '%s' (%s + %s) added", traderCfg.Name, aiModelCfg.Provider, exchangeCfg.ID)
 	return nil
 }
 
@@ -396,7 +396,7 @@ func (tm *TraderManager) GetTrader(id string) (*trader.AutoTrader, error) {
 
 	t, exists := tm.traders[id]
 	if !exists {
-		return nil, fmt.Errorf("trader ID '%s' 不存在", id)
+		return nil, fmt.Errorf("trader ID '%s' does not exist", id)
 	}
 	return t, nil
 }
@@ -430,12 +430,12 @@ func (tm *TraderManager) StartAll() {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
 
-	log.Println("🚀 启动所有Trader...")
+	log.Println("🚀 Starting all traders...")
 	for id, t := range tm.traders {
 		go func(traderID string, at *trader.AutoTrader) {
-			log.Printf("▶️  启动 %s...", at.GetName())
+			log.Printf("▶️  Starting %s...", at.GetName())
 			if err := at.Run(); err != nil {
-				log.Printf("❌ %s 运行错误: %v", at.GetName(), err)
+				log.Printf("❌ %s runtime error: %v", at.GetName(), err)
 			}
 		}(id, t)
 	}
@@ -446,7 +446,7 @@ func (tm *TraderManager) StopAll() {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
 
-	log.Println("⏹  停止所有Trader...")
+	log.Println("⏹  Stopping all traders...")
 	for _, t := range tm.traders {
 		t.Stop()
 	}
@@ -500,7 +500,7 @@ func (tm *TraderManager) GetCompetitionData() (map[string]interface{}, error) {
 			cachedData[k] = v
 		}
 		tm.competitionCache.mu.RUnlock()
-		log.Printf("📋 返回竞赛数据缓存 (缓存时间: %.1fs)", time.Since(tm.competitionCache.timestamp).Seconds())
+		log.Printf("📋 Returning competition data cache (cache age: %.1fs)", time.Since(tm.competitionCache.timestamp).Seconds())
 		return cachedData, nil
 	}
 	tm.competitionCache.mu.RUnlock()
@@ -514,7 +514,7 @@ func (tm *TraderManager) GetCompetitionData() (map[string]interface{}, error) {
 	}
 	tm.mu.RUnlock()
 
-	log.Printf("🔄 重新获取竞赛数据，交易员数量: %d", len(allTraders))
+	log.Printf("🔄 Refreshing competition data, trader count: %d", len(allTraders))
 
 	// 并发获取交易员数据
 	traders := tm.getConcurrentTraderData(allTraders)
@@ -603,7 +603,7 @@ func (tm *TraderManager) getConcurrentTraderData(traders []*trader.AutoTrader) [
 				}
 			case err := <-errorChan:
 				// 获取账户信息失败
-				log.Printf("⚠️ 获取交易员 %s 账户信息失败: %v", trader.GetID(), err)
+				log.Printf("⚠️ Failed to get account info for trader %s: %v", trader.GetID(), err)
 				traderData = map[string]interface{}{
 					"trader_id":       trader.GetID(),
 					"trader_name":     trader.GetName(),
@@ -615,11 +615,11 @@ func (tm *TraderManager) getConcurrentTraderData(traders []*trader.AutoTrader) [
 					"position_count":  0,
 					"margin_used_pct": 0.0,
 					"is_running":      status["is_running"],
-					"error":           "账户数据获取失败",
+					"error":           "Failed to retrieve account data",
 				}
 			case <-ctx.Done():
 				// 超时
-				log.Printf("⏰ 获取交易员 %s 账户信息超时", trader.GetID())
+				log.Printf("⏰ Timeout getting account info for trader %s", trader.GetID())
 				traderData = map[string]interface{}{
 					"trader_id":       trader.GetID(),
 					"trader_name":     trader.GetName(),
@@ -631,7 +631,7 @@ func (tm *TraderManager) getConcurrentTraderData(traders []*trader.AutoTrader) [
 					"position_count":  0,
 					"margin_used_pct": 0.0,
 					"is_running":      status["is_running"],
-					"error":           "获取超时",
+					"error":           "Retrieval timeout",
 				}
 			}
 
@@ -660,7 +660,7 @@ func (tm *TraderManager) GetTopTradersData() (map[string]interface{}, error) {
 	// 从竞赛数据中提取前5名
 	allTraders, ok := competitionData["traders"].([]map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("竞赛数据格式错误")
+		return nil, fmt.Errorf("invalid competition data format")
 	}
 
 	// 限制返回前5名
@@ -716,10 +716,10 @@ func (tm *TraderManager) LoadUserTraders(database *config.Database, userID strin
 	// 获取指定用户的所有交易员
 	traders, err := database.GetTraders(userID)
 	if err != nil {
-		return fmt.Errorf("获取用户 %s 的交易员列表失败: %w", userID, err)
+		return fmt.Errorf("failed to get trader list for user %s: %w", userID, err)
 	}
 
-	log.Printf("📋 为用户 %s 加载交易员配置: %d 个", userID, len(traders))
+	log.Printf("📋 Loading trader configurations for user %s: %d", userID, len(traders))
 
 	// 获取系统配置（不包含信号源，信号源现在为用户级别）
 	maxDailyLossStr, _ := database.GetSystemConfig("max_daily_loss")
@@ -732,9 +732,9 @@ func (tm *TraderManager) LoadUserTraders(database *config.Database, userID strin
 	if userSignalSource, err := database.GetUserSignalSource(userID); err == nil {
 		coinPoolURL = userSignalSource.CoinPoolURL
 		oiTopURL = userSignalSource.OITopURL
-		log.Printf("📡 加载用户 %s 的信号源配置: COIN POOL=%s, OI TOP=%s", userID, coinPoolURL, oiTopURL)
+		log.Printf("📡 Loading signal source config for user %s: COIN POOL=%s, OI TOP=%s", userID, coinPoolURL, oiTopURL)
 	} else {
-		log.Printf("🔍 用户 %s 暂未配置信号源", userID)
+		log.Printf("🔍 User %s has not configured signal sources yet", userID)
 	}
 
 	// 解析配置
@@ -757,7 +757,7 @@ func (tm *TraderManager) LoadUserTraders(database *config.Database, userID strin
 	var defaultCoins []string
 	if defaultCoinsStr != "" {
 		if err := json.Unmarshal([]byte(defaultCoinsStr), &defaultCoins); err != nil {
-			log.Printf("⚠️ 解析默认币种配置失败: %v，使用空列表", err)
+			log.Printf("⚠️ Failed to parse default coins config: %v, using empty list", err)
 			defaultCoins = []string{}
 		}
 	}
@@ -766,21 +766,21 @@ func (tm *TraderManager) LoadUserTraders(database *config.Database, userID strin
 	// 避免在循环中重复查询相同的数据，减少数据库压力和锁持有时间
 	aiModels, err := database.GetAIModels(userID)
 	if err != nil {
-		log.Printf("⚠️ 获取用户 %s 的AI模型配置失败: %v", userID, err)
-		return fmt.Errorf("获取AI模型配置失败: %w", err)
+		log.Printf("⚠️ Failed to get AI model config for user %s: %v", userID, err)
+		return fmt.Errorf("failed to get AI model config: %w", err)
 	}
 
 	exchanges, err := database.GetExchanges(userID)
 	if err != nil {
-		log.Printf("⚠️ 获取用户 %s 的交易所配置失败: %v", userID, err)
-		return fmt.Errorf("获取交易所配置失败: %w", err)
+		log.Printf("⚠️ Failed to get exchange config for user %s: %v", userID, err)
+		return fmt.Errorf("failed to get exchange config: %w", err)
 	}
 
 	// 为每个交易员加载配置
 	for _, traderCfg := range traders {
 		// 检查是否已经加载过这个交易员
 		if _, exists := tm.traders[traderCfg.ID]; exists {
-			log.Printf("⚠️ 交易员 %s 已经加载，跳过", traderCfg.Name)
+			log.Printf("⚠️ Trader %s already loaded, skipping", traderCfg.Name)
 			continue
 		}
 
@@ -799,19 +799,19 @@ func (tm *TraderManager) LoadUserTraders(database *config.Database, userID strin
 			for _, model := range aiModels {
 				if model.Provider == traderCfg.AIModelID {
 					aiModelCfg = model
-					log.Printf("⚠️  交易员 %s 使用旧版 provider 匹配: %s -> %s", traderCfg.Name, traderCfg.AIModelID, model.ID)
+					log.Printf("⚠️  Trader %s using legacy provider matching: %s -> %s", traderCfg.Name, traderCfg.AIModelID, model.ID)
 					break
 				}
 			}
 		}
 
 		if aiModelCfg == nil {
-			log.Printf("⚠️ 交易员 %s 的AI模型 %s 不存在，跳过", traderCfg.Name, traderCfg.AIModelID)
+			log.Printf("⚠️ AI model %s for trader %s does not exist, skipping", traderCfg.AIModelID, traderCfg.Name)
 			continue
 		}
 
 		if !aiModelCfg.Enabled {
-			log.Printf("⚠️ 交易员 %s 的AI模型 %s 未启用，跳过", traderCfg.Name, traderCfg.AIModelID)
+			log.Printf("⚠️ AI model %s for trader %s is not enabled, skipping", traderCfg.AIModelID, traderCfg.Name)
 			continue
 		}
 
@@ -825,19 +825,19 @@ func (tm *TraderManager) LoadUserTraders(database *config.Database, userID strin
 		}
 
 		if exchangeCfg == nil {
-			log.Printf("⚠️ 交易员 %s 的交易所 %s 不存在，跳过", traderCfg.Name, traderCfg.ExchangeID)
+			log.Printf("⚠️ Exchange %s for trader %s does not exist, skipping", traderCfg.ExchangeID, traderCfg.Name)
 			continue
 		}
 
 		if !exchangeCfg.Enabled {
-			log.Printf("⚠️ 交易员 %s 的交易所 %s 未启用，跳过", traderCfg.Name, traderCfg.ExchangeID)
+			log.Printf("⚠️ Exchange %s for trader %s is not enabled, skipping", traderCfg.ExchangeID, traderCfg.Name)
 			continue
 		}
 
 		// 使用现有的方法加载交易员
 		err = tm.loadSingleTrader(traderCfg, aiModelCfg, exchangeCfg, coinPoolURL, oiTopURL, maxDailyLoss, maxDrawdown, stopTradingMinutes, defaultCoins, database, userID)
 		if err != nil {
-			log.Printf("⚠️ 加载交易员 %s 失败: %v", traderCfg.Name, err)
+			log.Printf("⚠️ Failed to load trader %s: %v", traderCfg.Name, err)
 		}
 	}
 
@@ -859,14 +859,14 @@ func (tm *TraderManager) LoadTraderByID(database *config.Database, userID, trade
 
 	// 1. 检查是否已加载
 	if _, exists := tm.traders[traderID]; exists {
-		log.Printf("⚠️ 交易员 %s 已经加载，跳过", traderID)
+		log.Printf("⚠️ Trader %s already loaded, skipping", traderID)
 		return nil
 	}
 
 	// 2. 查询交易员配置
 	traders, err := database.GetTraders(userID)
 	if err != nil {
-		return fmt.Errorf("获取交易员列表失败: %w", err)
+		return fmt.Errorf("failed to get trader list: %w", err)
 	}
 
 	var traderCfg *config.TraderRecord
@@ -878,13 +878,13 @@ func (tm *TraderManager) LoadTraderByID(database *config.Database, userID, trade
 	}
 
 	if traderCfg == nil {
-		return fmt.Errorf("交易员 %s 不存在", traderID)
+		return fmt.Errorf("trader %s does not exist", traderID)
 	}
 
 	// 3. 查询AI模型配置
 	aiModels, err := database.GetAIModels(userID)
 	if err != nil {
-		return fmt.Errorf("获取AI模型配置失败: %w", err)
+		return fmt.Errorf("failed to get AI model config: %w", err)
 	}
 
 	var aiModelCfg *config.AIModelConfig
@@ -900,24 +900,24 @@ func (tm *TraderManager) LoadTraderByID(database *config.Database, userID, trade
 		for _, model := range aiModels {
 			if model.Provider == traderCfg.AIModelID {
 				aiModelCfg = model
-				log.Printf("⚠️ 交易员 %s 使用旧版 provider 匹配: %s -> %s", traderCfg.Name, traderCfg.AIModelID, model.ID)
+				log.Printf("⚠️ Trader %s using legacy provider matching: %s -> %s", traderCfg.Name, traderCfg.AIModelID, model.ID)
 				break
 			}
 		}
 	}
 
 	if aiModelCfg == nil {
-		return fmt.Errorf("AI模型 %s 不存在", traderCfg.AIModelID)
+		return fmt.Errorf("AI model %s does not exist", traderCfg.AIModelID)
 	}
 
 	if !aiModelCfg.Enabled {
-		return fmt.Errorf("AI模型 %s 未启用", traderCfg.AIModelID)
+		return fmt.Errorf("AI model %s is not enabled", traderCfg.AIModelID)
 	}
 
 	// 4. 查询交易所配置
 	exchanges, err := database.GetExchanges(userID)
 	if err != nil {
-		return fmt.Errorf("获取交易所配置失败: %w", err)
+		return fmt.Errorf("failed to get exchange config: %w", err)
 	}
 
 	var exchangeCfg *config.ExchangeConfig
@@ -929,11 +929,11 @@ func (tm *TraderManager) LoadTraderByID(database *config.Database, userID, trade
 	}
 
 	if exchangeCfg == nil {
-		return fmt.Errorf("交易所 %s 不存在", traderCfg.ExchangeID)
+		return fmt.Errorf("exchange %s does not exist", traderCfg.ExchangeID)
 	}
 
 	if !exchangeCfg.Enabled {
-		return fmt.Errorf("交易所 %s 未启用", traderCfg.ExchangeID)
+		return fmt.Errorf("exchange %s is not enabled", traderCfg.ExchangeID)
 	}
 
 	// 5. 查询系统配置
@@ -947,9 +947,9 @@ func (tm *TraderManager) LoadTraderByID(database *config.Database, userID, trade
 	if userSignalSource, err := database.GetUserSignalSource(userID); err == nil {
 		coinPoolURL = userSignalSource.CoinPoolURL
 		oiTopURL = userSignalSource.OITopURL
-		log.Printf("📡 加载用户 %s 的信号源配置: COIN POOL=%s, OI TOP=%s", userID, coinPoolURL, oiTopURL)
+		log.Printf("📡 Loading signal source config for user %s: COIN POOL=%s, OI TOP=%s", userID, coinPoolURL, oiTopURL)
 	} else {
-		log.Printf("🔍 用户 %s 暂未配置信号源", userID)
+		log.Printf("🔍 User %s has not configured signal sources yet", userID)
 	}
 
 	// 7. 解析系统配置
@@ -972,13 +972,13 @@ func (tm *TraderManager) LoadTraderByID(database *config.Database, userID, trade
 	var defaultCoins []string
 	if defaultCoinsStr != "" {
 		if err := json.Unmarshal([]byte(defaultCoinsStr), &defaultCoins); err != nil {
-			log.Printf("⚠️ 解析默认币种配置失败: %v，使用空列表", err)
+			log.Printf("⚠️ Failed to parse default coins config: %v, using empty list", err)
 			defaultCoins = []string{}
 		}
 	}
 
 	// 8. 调用私有方法加载交易员
-	log.Printf("📋 加载单个交易员: %s (%s)", traderCfg.Name, traderID)
+	log.Printf("📋 Loading single trader: %s (%s)", traderCfg.Name, traderID)
 	return tm.loadSingleTrader(
 		traderCfg,
 		aiModelCfg,
@@ -1018,7 +1018,7 @@ func (tm *TraderManager) loadSingleTrader(traderCfg *config.TraderRecord, aiMode
 	var effectiveCoinPoolURL string
 	if traderCfg.UseCoinPool && coinPoolURL != "" {
 		effectiveCoinPoolURL = coinPoolURL
-		log.Printf("✓ 交易员 %s 启用 COIN POOL 信号源: %s", traderCfg.Name, coinPoolURL)
+		log.Printf("✓ Trader %s enabled COIN POOL signal source: %s", traderCfg.Name, coinPoolURL)
 	}
 
 	// 构建AutoTraderConfig
@@ -1068,7 +1068,7 @@ func (tm *TraderManager) loadSingleTrader(traderCfg *config.TraderRecord, aiMode
 	// 创建trader实例
 	at, err := trader.NewAutoTrader(traderConfig, database, userID)
 	if err != nil {
-		return fmt.Errorf("创建trader失败: %w", err)
+		return fmt.Errorf("failed to create trader: %w", err)
 	}
 
 	// 设置自定义prompt（如果有）
@@ -1076,13 +1076,13 @@ func (tm *TraderManager) loadSingleTrader(traderCfg *config.TraderRecord, aiMode
 		at.SetCustomPrompt(traderCfg.CustomPrompt)
 		at.SetOverrideBasePrompt(traderCfg.OverrideBasePrompt)
 		if traderCfg.OverrideBasePrompt {
-			log.Printf("✓ 已设置自定义交易策略prompt (覆盖基础prompt)")
+			log.Printf("✓ Custom trading strategy prompt set (overriding base prompt)")
 		} else {
-			log.Printf("✓ 已设置自定义交易策略prompt (补充基础prompt)")
+			log.Printf("✓ Custom trading strategy prompt set (supplementing base prompt)")
 		}
 	}
 
 	tm.traders[traderCfg.ID] = at
-	log.Printf("✓ Trader '%s' (%s + %s) 已为用户加载到内存", traderCfg.Name, aiModelCfg.Provider, exchangeCfg.ID)
+	log.Printf("✓ Trader '%s' (%s + %s) loaded to memory for user", traderCfg.Name, aiModelCfg.Provider, exchangeCfg.ID)
 	return nil
 }

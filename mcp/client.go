@@ -39,9 +39,9 @@ func New() *Client {
 	if envMaxTokens := os.Getenv("AI_MAX_TOKENS"); envMaxTokens != "" {
 		if parsed, err := strconv.Atoi(envMaxTokens); err == nil && parsed > 0 {
 			maxTokens = parsed
-			log.Printf("🔧 [MCP] 使用环境变量 AI_MAX_TOKENS: %d", maxTokens)
+			log.Printf("🔧 [MCP] Using environment variable AI_MAX_TOKENS: %d", maxTokens)
 		} else {
-			log.Printf("⚠️  [MCP] 环境变量 AI_MAX_TOKENS 无效 (%s)，使用默认值: %d", envMaxTokens, maxTokens)
+			log.Printf("⚠️  [MCP] Invalid environment variable AI_MAX_TOKENS (%s), using default: %d", envMaxTokens, maxTokens)
 		}
 	}
 
@@ -62,17 +62,17 @@ func (client *Client) SetDeepSeekAPIKey(apiKey string, customURL string, customM
 	client.APIKey = apiKey
 	if customURL != "" {
 		client.BaseURL = customURL
-		log.Printf("🔧 [MCP] DeepSeek 使用自定义 BaseURL: %s", customURL)
+		log.Printf("🔧 [MCP] DeepSeek using custom BaseURL: %s", customURL)
 	} else {
 		client.BaseURL = "https://api.deepseek.com/v1"
-		log.Printf("🔧 [MCP] DeepSeek 使用默认 BaseURL: %s", client.BaseURL)
+		log.Printf("🔧 [MCP] DeepSeek using default BaseURL: %s", client.BaseURL)
 	}
 	if customModel != "" {
 		client.Model = customModel
-		log.Printf("🔧 [MCP] DeepSeek 使用自定义 Model: %s", customModel)
+		log.Printf("🔧 [MCP] DeepSeek using custom Model: %s", customModel)
 	} else {
 		client.Model = "deepseek-chat"
-		log.Printf("🔧 [MCP] DeepSeek 使用默认 Model: %s", client.Model)
+		log.Printf("🔧 [MCP] DeepSeek using default Model: %s", client.Model)
 	}
 	// 打印 API Key 的前后各4位用于验证
 	if len(apiKey) > 8 {
@@ -87,17 +87,17 @@ func (client *Client) SetQwenAPIKey(apiKey string, customURL string, customModel
 	client.APIKey = apiKey
 	if customURL != "" {
 		client.BaseURL = customURL
-		log.Printf("🔧 [MCP] Qwen 使用自定义 BaseURL: %s", customURL)
+		log.Printf("🔧 [MCP] Qwen using custom BaseURL: %s", customURL)
 	} else {
 		client.BaseURL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-		log.Printf("🔧 [MCP] Qwen 使用默认 BaseURL: %s", client.BaseURL)
+		log.Printf("🔧 [MCP] Qwen using default BaseURL: %s", client.BaseURL)
 	}
 	if customModel != "" {
 		client.Model = customModel
-		log.Printf("🔧 [MCP] Qwen 使用自定义 Model: %s", customModel)
+		log.Printf("🔧 [MCP] Qwen using custom Model: %s", customModel)
 	} else {
 		client.Model = "qwen3-max"
-		log.Printf("🔧 [MCP] Qwen 使用默认 Model: %s", client.Model)
+		log.Printf("🔧 [MCP] Qwen using default Model: %s", client.Model)
 	}
 	// 打印 API Key 的前后各4位用于验证
 	if len(apiKey) > 8 {
@@ -134,7 +134,7 @@ func (client *Client) SetClient(Client Client) {
 // CallWithMessages 使用 system + user prompt 调用AI API（推荐）
 func (client *Client) CallWithMessages(systemPrompt, userPrompt string) (string, error) {
 	if client.APIKey == "" {
-		return "", fmt.Errorf("AI API密钥未设置，请先调用 SetDeepSeekAPIKey() 或 SetQwenAPIKey()")
+		return "", fmt.Errorf("AI API key not set, please call SetDeepSeekAPIKey() or SetQwenAPIKey() first")
 	}
 
 	// 重试配置
@@ -168,7 +168,7 @@ func (client *Client) CallWithMessages(systemPrompt, userPrompt string) (string,
 		}
 	}
 
-	return "", fmt.Errorf("重试%d次后仍然失败: %w", maxRetries, lastErr)
+	return "", fmt.Errorf("failed after %d retries: %w", maxRetries, lastErr)
 }
 
 // callOnce 单次调用AI API（内部使用）
@@ -213,7 +213,7 @@ func (client *Client) callOnce(systemPrompt, userPrompt string) (string, error) 
 
 	jsonData, err := json.Marshal(requestBody)
 	if err != nil {
-		return "", fmt.Errorf("序列化请求失败: %w", err)
+		return "", fmt.Errorf("failed to serialize request: %w", err)
 	}
 
 	// 创建HTTP请求
@@ -229,7 +229,7 @@ func (client *Client) callOnce(systemPrompt, userPrompt string) (string, error) 
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", fmt.Errorf("创建请求失败: %w", err)
+		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -250,18 +250,18 @@ func (client *Client) callOnce(systemPrompt, userPrompt string) (string, error) 
 	httpClient := &http.Client{Timeout: client.Timeout}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("发送请求失败: %w", err)
+		return "", fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// 读取响应
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("读取响应失败: %w", err)
+		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API返回错误 (status %d): %s", resp.StatusCode, string(body))
+		return "", fmt.Errorf("API returned error (status %d): %s", resp.StatusCode, string(body))
 	}
 
 	// 解析响应
@@ -274,11 +274,11 @@ func (client *Client) callOnce(systemPrompt, userPrompt string) (string, error) 
 	}
 
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("解析响应失败: %w", err)
+		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	if len(result.Choices) == 0 {
-		return "", fmt.Errorf("API返回空响应")
+		return "", fmt.Errorf("API returned empty response")
 	}
 
 	return result.Choices[0].Message.Content, nil
